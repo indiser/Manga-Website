@@ -323,6 +323,148 @@ nhentai-website/
 
 ---
 
+## 🔮 Future Enhancements (AKA My Procrastination List)
+
+### Features I'll "Definitely" Add (Narrator: He Won't)
+
+#### 🎯 High Priority (Translation: Maybe Someday)
+
+- **🗄️ Database Integration**
+  - *Current Status:* Everything lives in memory like it's 1995
+  - *Plan:* Add PostgreSQL or MongoDB
+  - *Reality:* "But it works fine without it..."
+  - *ETA:* When I run out of RAM (so, never)
+
+- **🔐 User Authentication**
+  - *Current Status:* Everyone is admin (democracy!)
+  - *Plan:* JWT tokens, OAuth, the whole nine yards
+  - *Reality:* "Do I really need to track who downloads what?"
+  - *ETA:* When my mom asks for a login
+
+- **⚡ Redis Caching**
+  - *Current Status:* Hitting the API like it owes me money
+  - *Plan:* Cache everything, be smart about it
+  - *Reality:* "The API is fast enough... right?"
+  - *ETA:* After the 429 Too Many Requests incident
+
+- **🧪 Unit Tests**
+  - *Current Status:* "It works on my machine" IS the test
+  - *Plan:* 80% code coverage, pytest, the works
+  - *Reality:* "Testing is for people who make mistakes"
+  - *ETA:* After the first production bug (so, tomorrow)
+
+#### 🌟 Medium Priority (Translation: Probably Never)
+
+- **🌙 Dark/Light Mode Toggle**
+  - Because apparently dark mode isn't dark enough for some people
+  - Will add 47 shades of gray
+  - ETA: When someone complains about eye strain
+
+- **📊 Analytics Dashboard**
+  - Track what people search for (for science)
+  - Realize everyone searches the same 5 things
+  - Question humanity
+  - ETA: When I want to feel like a data scientist
+
+- **🔔 Notification System**
+  - "New upload in your favorite tag!"
+  - Realize I'm building a social network
+  - Have an existential crisis
+  - ETA: Never, I have enough notifications in my life
+
+- **💬 Comment System**
+  - Let users leave reviews
+  - Immediately regret it
+  - Spend 90% of time moderating
+  - ETA: When I hate myself
+
+#### 🎨 Low Priority (Translation: In Another Universe)
+
+- **🤖 AI-Powered Recommendations**
+  - Train a neural network on user behavior
+  - Realize I need a PhD for this
+  - Use a random number generator instead
+  - Call it "AI-powered"
+  - ETA: When AI becomes sentient and does it for me
+
+- **📱 Native Mobile App**
+  - React Native? Flutter? SwiftUI?
+  - Spend 6 months deciding
+  - Realize the mobile web works fine
+  - Add `<meta name="viewport">` and call it a day
+  - ETA: When I learn mobile development (so, 2050)
+
+- **🎮 Gamification**
+  - Achievement badges for reading
+  - Leaderboards for... something
+  - Realize I'm not building Duolingo
+  - ETA: April 1st (as a joke)
+
+- **🌍 Multi-Language Support**
+  - i18n for the UI
+  - Translations for 47 languages
+  - Realize 99% of users speak English
+  - ETA: When I'm fluent in 47 languages
+
+### 🐛 Known Issues (That I'm Choosing to Ignore)
+
+- **The PDF download is slower than my grandma's internet**
+  - *Solution:* Make better life choices
+  - *Actual Solution:* Implement async processing with Celery
+  - *My Solution:* Add a loading spinner and hope people are patient
+
+- **No error handling for when the source site is down**
+  - *Current Behavior:* App explodes spectacularly
+  - *Planned Fix:* Graceful error messages
+  - *Actual Fix:* "Have you tried turning it off and on again?"
+
+- **Memory leaks somewhere (probably)**
+  - *Evidence:* My laptop sounds like a jet engine
+  - *Investigation Status:* Pending
+  - *Workaround:* Restart the server daily
+  - *Real Solution:* Buy more RAM
+
+- **The code needs refactoring**
+  - *Current State:* Spaghetti code with meatballs
+  - *Plan:* Clean architecture, SOLID principles
+  - *Reality:* "If it ain't broke, don't fix it"
+  - *Counter-argument:* "But it IS broke"
+  - *Response:* "But it WORKS"
+
+### 💡 Ideas From 3 AM Me (Probably Bad)
+
+- Blockchain integration (for some reason)
+- NFT support (because why not make it worse)
+- Cryptocurrency mining in the background (kidding... unless?)
+- VR reader mode (for the future)
+- Integration with smart home devices ("Alexa, read me manga")
+- Smell-o-vision support (technology isn't there yet)
+- Time travel feature (still debugging)
+
+### 🎯 Realistic Roadmap
+
+**Q1 2024:** Fix that one annoying bug  
+**Q2 2024:** Add the feature I promised  
+**Q3 2024:** Refactor (lol jk)  
+**Q4 2024:** Start a new project and abandon this one  
+**Q1 2025:** Come back because someone opened an issue  
+**Q2 2025:** "I should really update the dependencies"  
+**Q3 2025:** Update dependencies, everything breaks  
+**Q4 2025:** Revert to old dependencies  
+
+### 📝 Contributing to Future Enhancements
+
+Want to implement any of these features? Please do! I'll be here, cheering you on from the sidelines while I:
+- Start 5 new projects
+- Learn a new framework
+- Rewrite my portfolio for the 47th time
+- Question my career choices
+- Browse memes on Reddit
+
+**Seriously though,** PRs are welcome. I promise to review them faster than I implement my own features (low bar, I know).
+
+---
+
 ## ❓ FAQ (Frequently Awkward Questions)
 
 ### Q: Is this legal?
