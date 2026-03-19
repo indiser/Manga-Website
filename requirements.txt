@@ -1,0 +1,8 @@
+flask
+flask-cors
+curl_cffi
+requests
+beautifulsoup4
+img2pdf
+pillow
+gunicorn

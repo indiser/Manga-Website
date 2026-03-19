@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Manga Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        nhPink: '#ed2553',
+                        nhPinkHover: '#ff2a5f',
+                        nhDark: '#1f1f1f',
+                        nhCard: '#2b2b2b',
+                        nhTag: '#333333'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Keeping minimal custom CSS only for the custom scrollbar and modal locked states */
+        body { background-color: #1a1a1a; color: #e0e0e0; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ed2553; }
+    </style>
+</head>
+<body class="antialiased font-sans pb-12">
+
+    <nav class="bg-nhDark border-b border-gray-800 p-4 mb-8 shadow-lg">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-2xl font-bold tracking-tight"><span class="text-nhPink">Hentai</span>Manga</h1>
+            <div class="flex gap-2 w-full sm:w-auto">
+                <input type="text" id="mangaId" placeholder="Enter ID, Name, or Tags" class="bg-gray-800 text-white border border-gray-700 rounded px-4 py-2 w-full sm:w-64 focus:outline-none focus:border-nhPink transition-colors">
+                <button onclick="fetchManga()" class="bg-nhPink hover:bg-nhPinkHover text-white font-bold py-2 px-6 rounded transition-colors whitespace-nowrap">Search</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="output" class="max-w-6xl mx-auto px-4"></main>
+
+    <div id="reader-modal" class="hidden fixed inset-0 bg-black/95 z-50 flex-col items-center justify-center">
+        <div class="absolute top-4 right-6 text-4xl text-gray-500 hover:text-white cursor-pointer font-bold select-none" onclick="closeReader()">&times;</div>
+        
+        <img id="reader-image" src="" alt="Manga Page" referrerpolicy="no-referrer" class="max-w-[95vw] max-h-[85vh] object-contain shadow-2xl">
+        
+        <div class="mt-6 flex gap-4 items-center bg-nhDark px-6 py-3 rounded-lg border border-gray-800 shadow-xl">
+            <button onclick="prevImage()" class="text-gray-300 hover:text-white hover:bg-gray-700 px-4 py-2 rounded transition-colors">&#8592; Prev</button>
+            <span class="font-mono text-gray-400 font-bold tracking-widest" id="page-counter">0 / 0</span>
+            <button onclick="downloadCurrentPage()" class="bg-green-600 hover:bg-green-500 text-white font-bold px-4 py-2 rounded transition-colors">Download Page</button>
+            <button onclick="nextImage()" class="text-gray-300 hover:text-white hover:bg-gray-700 px-4 py-2 rounded transition-colors">Next &#8594;</button>
+        </div>
+    </div>
+
+    <script>
+        // ADD THIS AT THE VERY TOP OF YOUR <script> BLOCK
+        document.addEventListener('DOMContentLoaded', () => {
+            // Read the current URL parameters when the app boots
+            const urlParams = new URLSearchParams(window.location.search);
+            const mangaId = urlParams.get('manga_id');
+            const query = urlParams.get('q');
+
+            if (mangaId) {
+                document.getElementById('mangaId').value = mangaId;
+                fetchManga(true); // true means "don't push a new history state, we just got here"
+            } else if (query) {
+                document.getElementById('mangaId').value = query;
+                executeSearch(query, true);
+            } else {
+                loadHomepage(true);
+            }
+        });
+
+
+        window.addEventListener('popstate', (event) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mangaId = urlParams.get('manga_id');
+            const query = urlParams.get('q');
+
+            if (mangaId) {
+                document.getElementById('mangaId').value = mangaId;
+                fetchManga(true); 
+            } else if (query) {
+                document.getElementById('mangaId').value = query;
+                executeSearch(query, true);
+            } else {
+                document.getElementById('mangaId').value = '';
+                loadHomepage(true);
+            }
+        });
+
+    async function loadHomepage(isHistoryNav = false, page = 1) {
+            currentPage = page;
+            currentMode = 'home';
+
+            if (!isHistoryNav && page === 1) {
+                window.history.pushState({}, '', '/');
+            }
+            
+            const outputDiv = document.getElementById('output');
+            
+            // Only show the massive loading screen if it's the first page
+            if (page === 1) {
+                outputDiv.innerHTML = '<div class="flex justify-center mt-32"><div class="animate-pulse text-nhPink font-bold text-2xl tracking-widest">INITIALIZING FEED...</div></div>';
+            } else {
+                // Change the Load More button to a loading state
+                const loadBtn = document.getElementById('load-more-btn');
+                if(loadBtn) loadBtn.innerHTML = 'Loading...';
+            }
+    
+            try {
+                const response = await fetch(`/api/homepage?page=${page}`);
+                if (!response.ok) throw new Error('Failed to load homepage data');
+                const data = await response.json();
+        
+                if (data.error) throw new Error(data.error);
+
+                const flagMap = {
+                    'english': 'https://flagcdn.com/w20/gb.png',
+                    'chinese': 'https://flagcdn.com/w20/cn.png',
+                    'japanese': 'https://flagcdn.com/w20/jp.png'
+                };
+
+                // const gridHtml = data.map(manga => `
+                //     <div class="bg-nhCard rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-nhPink transition-all duration-200 shadow-lg group flex flex-col" onclick="loadMangaDirectly('${manga.id}')">
+                //         <div class="relative w-full aspect-[3/4] overflow-hidden bg-nhDark">
+                //             <img src="${manga.cover_image}" referrerpolicy="no-referrer" loading="lazy" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                //         </div>
+                //         <div class="p-3 flex-1 flex flex-col justify-between">
+                //             <h4 class="text-xs font-bold text-gray-300 line-clamp-2 leading-snug group-hover:text-white transition-colors">${manga.title}</h4>
+                //         </div>
+                //     </div>
+                // `).join('');
+
+                const gridHtml = data.map(manga => {
+                    // Look up the flag based strictly on the backend's payload.
+                    const flagSrc = flagMap[manga.language];
+                    
+                    // Generate the inline image tag only if a flag exists.
+                    const flagHtml = flagSrc 
+                        ? `<img src="${flagSrc}" alt="${manga.language}" class="inline-block w-[18px] h-[12px] mr-1 align-baseline rounded-sm shadow-sm">` 
+                        : '';
+
+                    return `
+                    <div class="bg-nhCard rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-nhPink transition-all duration-200 shadow-lg group flex flex-col" onclick="loadMangaDirectly('${manga.id}')">
+                        <div class="relative w-full aspect-[3/4] overflow-hidden bg-nhDark">
+                            <img src="${manga.cover_image}" referrerpolicy="no-referrer" loading="lazy" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col justify-start">
+                            <h4 class="text-xs font-bold text-gray-300 line-clamp-2 leading-snug group-hover:text-white transition-colors">
+                                ${flagHtml}${manga.title}
+                            </h4>
+                        </div>
+                    </div>
+                `}).join('');
+
+
+                if (page === 1) {
+                    // Page 1: Create the grid and the Load More button container
+                    outputDiv.innerHTML = `
+                        <div class="flex items-center gap-3 mb-6 border-b border-gray-800 pb-3 mt-6">
+                            <div class="w-2 h-6 bg-nhPink rounded-sm"></div>
+                            <h2 class="text-2xl font-bold text-white tracking-wide">Latest Uploads</h2>
+                        </div>
+                        <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5 pb-10">
+                            ${gridHtml}
+                        </div>
+                        <div id="load-more-container" class="flex justify-center pb-12">
+                            <button id="load-more-btn" onclick="loadMore()" class="bg-nhDark border border-gray-700 hover:border-nhPink text-white font-bold py-3 px-12 rounded-full transition-all shadow-lg hover:shadow-nhPink/20 tracking-wider">
+                                LOAD MORE
+                            </button>
+                        </div>
+                    `;
+                 } else {
+                    // Page 2+: Inject the new HTML directly into the existing grid
+                    document.getElementById('grid-container').insertAdjacentHTML('beforeend', gridHtml);
+                    
+                    // Reset the button text, or hide it if no results came back
+                    const loadBtn = document.getElementById('load-more-btn');
+                    if (data.length === 0) {
+                        loadBtn.style.display = 'none';
+                    } else {
+                        loadBtn.innerHTML = 'LOAD MORE';
+                    }
+                }
+            } catch (error) {
+                if (page === 1) {
+                    outputDiv.innerHTML = `<div class="bg-red-900/30 border-l-4 border-nhPink text-white p-4 rounded">Failed to connect to backend: ${error.message}</div>`;
+                }
+            }
+        }
+
+
+
+    // Helper function to bridge the click from the grid to your existing reader logic
+    function loadMangaDirectly(id) {
+        document.getElementById('mangaId').value = id;
+        fetchManga();
+        // Scroll smoothly to the top so the user sees the newly loaded manga details
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+        let currentUrls = [];
+        let currentIndex = 0;
+        let currentPage = 1;
+        let currentMode = 'home'; // Tracks if we are on 'home' or 'search'
+        let currentQuery = '';
+
+        // Helper function to build Tailwind tag rows cleanly
+        function buildTagRow(label, tags) {
+            if (!tags || tags.length === 0) return '';
+    
+            let prefix = 'tag';
+            const lLower = label.toLowerCase();
+            if (lLower === 'characters') prefix = 'character';
+            else if (lLower === 'parodies') prefix = 'parody';
+            else if (lLower === 'artists') prefix = 'artist';
+            else if (lLower === 'groups') prefix = 'group';
+            else if (lLower === 'languages') prefix = 'language';
+            else if (lLower === 'categories') prefix = 'category';
+
+            const tagHTML = tags.map(tag => {
+                const formattedTag = tag.replace(/\s+/g, '-'); 
+                const query = `${prefix}:"${formattedTag}"`;
+                
+                // Encode the string to neutralize the double quotes safely
+                const encodedQuery = encodeURIComponent(query);
+        
+                return `<span onclick="executeSearch(decodeURIComponent('${encodedQuery}'))" 
+                            class="bg-nhTag hover:bg-nhPink text-gray-300 hover:text-white cursor-pointer px-2 py-1 rounded text-sm font-semibold transition-colors capitalize shadow-sm">
+                            ${tag}
+                        </span>`;
+            }).join('');
+    
+            return `<div class="flex flex-wrap items-baseline gap-2 mb-3">
+                        <span class="text-gray-500 font-bold w-24 shrink-0">${label}:</span>
+                        <div class="flex flex-wrap gap-2">${tagHTML}</div>
+                    </div>`;
+        }
+
+
+        async function executeSearch(query, isHistoryNav = false, page = 1) {
+            currentPage = page;
+            currentMode = 'search';
+            currentQuery = query;
+
+            if (!isHistoryNav && page === 1) {
+                window.history.pushState({}, '', `/?q=${encodeURIComponent(query)}`);
+            }
+
+            document.getElementById('mangaId').value = query;
+            const outputDiv = document.getElementById('output');
+            
+            if (page === 1) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                outputDiv.innerHTML = '<div class="flex justify-center mt-32"><div class="animate-pulse text-nhPink font-bold text-2xl tracking-widest">SEARCHING...</div></div>';
+            } else {
+                const loadBtn = document.getElementById('load-more-btn');
+                if(loadBtn) loadBtn.innerHTML = 'Loading...';
+            }
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&page=${page}`);
+                if (!response.ok) throw new Error('Search failed');
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+
+                if (data.length === 0 && page === 1) {
+                    outputDiv.innerHTML = `
+                    <button onclick="returnToHome()" class="mb-6 mt-6 flex items-center gap-2 text-nhPink hover:text-white font-bold transition-colors group">
+                        <span class="group-hover:-translate-x-1 transition-transform">&larr;</span> Back to Feed
+                    </button>
+                    <div class="text-center text-gray-500 mt-20 text-xl font-bold">No results found for <span class="text-white">${query}</span></div>`;
+                    return;
+                }
+
+                const flagMap = {
+                    'english': 'https://flagcdn.com/w20/gb.png',
+                    'chinese': 'https://flagcdn.com/w20/cn.png',
+                    'japanese': 'https://flagcdn.com/w20/jp.png'
+                };
+
+                // const gridHtml = data.map(manga => `
+                //     <div class="bg-nhCard rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-nhPink transition-all duration-200 shadow-lg group flex flex-col" onclick="loadMangaDirectly('${manga.id}')">
+                //         <div class="relative w-full aspect-[3/4] overflow-hidden bg-nhDark">
+                //             <img src="${manga.cover_image}" referrerpolicy="no-referrer" loading="lazy" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                //         </div>
+                //         <div class="p-3 flex-1 flex flex-col justify-between">
+                //             <h4 class="text-xs font-bold text-gray-300 line-clamp-2 leading-snug group-hover:text-white transition-colors">${manga.title}</h4>
+                //         </div>
+                //     </div>
+                // `).join('');
+
+                const gridHtml = data.map(manga => {
+                    // Look up the flag based strictly on the backend's payload.
+                    const flagSrc = flagMap[manga.language];
+                    
+                    // Generate the inline image tag only if a flag exists.
+                    const flagHtml = flagSrc 
+                        ? `<img src="${flagSrc}" alt="${manga.language}" class="inline-block w-[18px] h-[12px] mr-1 align-baseline rounded-sm shadow-sm">` 
+                        : '';
+
+                    return `
+                    <div class="bg-nhCard rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-nhPink transition-all duration-200 shadow-lg group flex flex-col" onclick="loadMangaDirectly('${manga.id}')">
+                        <div class="relative w-full aspect-[3/4] overflow-hidden bg-nhDark">
+                            <img src="${manga.cover_image}" referrerpolicy="no-referrer" loading="lazy" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col justify-start">
+                            <h4 class="text-xs font-bold text-gray-300 line-clamp-2 leading-snug group-hover:text-white transition-colors">
+                                ${flagHtml}${manga.title}
+                            </h4>
+                        </div>
+                    </div>
+                `}).join('');
+
+
+                if (page === 1) {
+                    outputDiv.innerHTML = `
+                        <div class="flex items-center justify-between mb-6 border-b border-gray-800 pb-3 mt-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-6 bg-nhPink rounded-sm"></div>
+                                <h2 class="text-2xl font-bold text-white tracking-wide truncate max-w-[60vw]">Results for: <span class="text-nhPink">${query}</span></h2>
+                            </div>
+                            <button onclick="returnToHome()" class="text-gray-400 hover:text-white font-bold transition-colors flex items-center gap-2 shrink-0">
+                                &larr; Home
+                            </button>
+                        </div>
+                        <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5 pb-10">
+                            ${gridHtml}
+                        </div>
+                        <div id="load-more-container" class="flex justify-center pb-12">
+                            <button id="load-more-btn" onclick="loadMore()" class="bg-nhDark border border-gray-700 hover:border-nhPink text-white font-bold py-3 px-12 rounded-full transition-all shadow-lg hover:shadow-nhPink/20 tracking-wider">
+                                LOAD MORE
+                            </button>
+                        </div>
+                    `;
+                }else {
+                    document.getElementById('grid-container').insertAdjacentHTML('beforeend', gridHtml);
+                    const loadBtn = document.getElementById('load-more-btn');
+                    if (data.length === 0) {
+                        loadBtn.style.display = 'none'; // Hide button if no more results
+                    } else {
+                        loadBtn.innerHTML = 'LOAD MORE';
+                    }
+                }
+            } catch (error) {
+                 if (page === 1) {
+                    outputDiv.innerHTML = `<div class="bg-red-900/30 border-l-4 border-nhPink text-white p-4 rounded">Search request failed: ${error.message}</div>`;
+                 }
+            }
+        }
+
+        async function fetchManga(isHistoryNav = false) {
+            const id = document.getElementById('mangaId').value.trim();
+            const outputDiv = document.getElementById('output');
+            
+            if (!id) {
+                outputDiv.innerHTML = '<div class="bg-red-900/30 border-l-4 border-nhPink text-nhPink p-4 rounded">Please enter a valid ID.</div>';
+                return;
+            }
+
+            if (/^\d+$/.test(id)){
+                    if (!isHistoryNav) {
+                        // Update the URL to show ?manga_id=123456
+                        window.history.pushState({}, '', `/?manga_id=${id}`);
+                    }
+                    outputDiv.innerHTML = '<div class="flex justify-center mt-20"><div class="animate-pulse text-nhPink font-bold text-xl">Loading payload...</div></div>';
+
+                    try {
+                        const response = await fetch(`/api?manga_id=${id}`);
+                        if (!response.ok) throw new Error(`Server rejected request: ${response.status}`);
+                        const data = await response.json();
+                
+                        currentUrls = data.page_urls || [];
+
+                        outputDiv.innerHTML = `
+                            <button onclick="returnToHome()" class="mb-6 flex items-center gap-2 text-nhPink hover:text-white font-bold        transition-colors group">
+                            <span class="group-hover:-translate-x-1 transition-transform">&larr;</span> Back to Feed
+                            </button>
+                            <div class="flex flex-col md:flex-row gap-8 bg-nhCard p-6 rounded-lg shadow-xl border border-gray-800">
+                                <div class="w-full md:w-[350px] shrink-0">
+                                    <img src="${data.cover_image}" alt="Cover" referrerpolicy="no-referrer" class="w-full rounded-md shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+                                </div>
+                        
+                                <div class="flex-1 text-gray-200">
+                                    <h2 class="text-2xl md:text-3xl font-bold text-white mb-6 leading-tight">${data.title}</h2>
+                            
+                                    <div class="bg-nhDark p-4 rounded-md border border-gray-700 mb-6 flex flex-wrap gap-6 text-sm">
+                                        <p><span class="text-gray-500 font-bold">ID:</span> <span class="font-mono text-nhPink">${id}</span></p>
+                                        <p><span class="text-gray-500 font-bold">Pages:</span> <span class="font-bold">${data.num_pages}</span></p>
+                                        <p><span class="text-gray-500 font-bold">Favorites:</span> <span class="font-bold">${data.favorites}</span></p>
+                                        <p><span class="text-gray-500 font-bold">Uploaded:</span> <span class="font-bold">${data.date}</span></p>
+                                    </div>
+
+                                    <div class="mb-8">
+                                        ${buildTagRow('Parodies', data.parodies)}
+                                        ${buildTagRow('Characters', data.charecters)}
+                                        ${buildTagRow('Tags', data.tags)}
+                                        ${buildTagRow('Artists', data.artists)}
+                                        ${buildTagRow('Groups', data.groups)}
+                                        ${buildTagRow('Languages', data.language)}
+                                        ${buildTagRow('Categories', data.categories)}
+                                    </div>
+                                    <div class="flex flex-wrap gap-4 mt-auto">
+                                        <button onclick="openReader(0)" class="bg-nhPink hover:bg-nhPinkHover text-white font-bold py-3 px-8 rounded flex-1 md:flex-none text-center transition-colors shadow-lg">Read Now</button>
+    
+                                        <button id="pdf-btn" onclick="downloadPdf('${id}')" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded flex-1 md:flex-none text-center transition-colors shadow-lg">
+                                            Download PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-12">
+                                <h3 class="text-xl font-bold text-white mb-6 border-b border-gray-800 pb-2">Gallery</h3>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                                    ${currentUrls.length > 0 
+                                        ? currentUrls.map((url, index) => {
+                                            // ARCHITECTURAL FIX: Convert full image URL to Thumbnail URL to save bandwidth
+                                            const thumbUrl = url.replace('https://i.nhentai.net', 'https://t.nhentai.net').replace(/\.(jpg|png|webp|gif)$/i, 't.$1');
+                                            return `
+                                            <div class="relative group cursor-pointer overflow-hidden rounded bg-nhDark border border-gray-800" onclick="openReader(${index})">
+                                                <img src="${thumbUrl}" loading="lazy" referrerpolicy="no-referrer" alt="Page ${index + 1}" class="w-full h-[250px] object-cover group-hover:scale-110 group-hover:opacity-75 transition-all duration-300">
+                                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2 text-xs font-bold text-center opacity-0 group-hover:opacity-100 transition-opacity">Page ${index + 1}</div>
+                                            </div>
+                                            `;
+                                        }).join('')
+                                        : '<p class="text-gray-500 col-span-full">No pages found.</p>'
+                                    }
+                                </div>
+                            </div>
+                        `;
+                    } catch (error) {
+                        outputDiv.innerHTML = `<div class="bg-red-900/30 border-l-4 border-nhPink text-white p-4 rounded"><strong class="text-nhPink">System Failure:</strong> ${error.message}</div>`;
+                    }
+            } else {
+                // It contains text, so trigger the search engine
+                executeSearch(id);
+            }
+        }
+
+        /* --- LIGHTBOX READER LOGIC --- */
+        function openReader(index) {
+            if (currentUrls.length === 0) return;
+            currentIndex = index;
+            document.getElementById('reader-modal').classList.remove('hidden');
+            document.getElementById('reader-modal').classList.add('flex');
+            document.body.style.overflow = 'hidden'; 
+            updateReader();
+        }
+
+        function updateReader() {
+            document.getElementById('reader-image').src = currentUrls[currentIndex];
+            document.getElementById('page-counter').innerText = `${currentIndex + 1} / ${currentUrls.length}`;
+        }
+
+        function nextImage() {
+            if (currentIndex < currentUrls.length - 1) {
+                currentIndex++;
+                updateReader();
+            }
+        }
+
+        function prevImage() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateReader();
+            }
+        }
+
+        function closeReader() {
+            document.getElementById('reader-modal').classList.add('hidden');
+            document.getElementById('reader-modal').classList.remove('flex');
+            document.body.style.overflow = 'auto'; 
+            document.getElementById('reader-image').src = ''; 
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const modal = document.getElementById('reader-modal');
+            if (!modal.classList.contains('hidden')) {
+                if (e.key === 'ArrowRight') nextImage();
+                if (e.key === 'ArrowLeft') prevImage();
+                if (e.key === 'Escape') closeReader();
+            }
+        });
+
+        function downloadCurrentPage() {
+            if (currentUrls.length === 0) return;
+            const url = currentUrls[currentIndex];
+            const rawTitle = document.querySelector('h2').innerText;
+            const mangaId = document.getElementById('mangaId').value;
+            const pageNum = String(currentIndex + 1).padStart(3, '0');
+            const safeTitle = rawTitle.replace(/[^a-z0-9 ]/gi, '').trim().substring(0, 40);
+            const customFilename = `[${mangaId}] ${safeTitle} - pg${pageNum}.png`;
+            window.location.href = `/api/download_page?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(customFilename)}`;
+        }
+
+        function returnToHome() {
+            // Clear the search input box
+            document.getElementById('mangaId').value = '';
+    
+            // Smooth scroll back to the top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+            // Re-render the homepage grid
+            loadHomepage(false);
+        }
+
+        async function downloadPdf(id) {
+            const btn = document.getElementById('pdf-btn');
+            const originalHtml = btn.innerHTML;
+
+            // 1. Lock the UI and show a Tailwind SVG loading spinner
+            btn.disabled = true;
+            btn.classList.replace('bg-green-600', 'bg-gray-700');
+            btn.classList.replace('hover:bg-green-500', 'cursor-not-allowed');
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Compiling... Do not close.`;
+
+            try {
+                // 2. Fetch the PDF silently in the background
+                const response = await fetch(`/api/download?manga_id=${id}`);
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `Server Error: ${response.status}`);
+                }
+
+                // 3. Convert the background response to a Blob and trigger the browser download
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+
+                // Extract the safe filename the server generated, or fallback to a default
+                let filename = `${id}_manga.pdf`;
+                const disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    filename = disposition.split('filename=')[1].replace(/['"]/g, '');
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+        
+                // Clean up the DOM
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+
+            } catch (error) {
+                alert(`Download failed: ${error.message}`);
+            } finally {
+                // 4. Restore the button to normal
+                btn.disabled = false;
+                btn.classList.replace('bg-gray-700', 'bg-green-600');
+                btn.classList.replace('cursor-not-allowed', 'hover:bg-green-500');
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        function loadMore() {
+            const nextPage = currentPage + 1;
+            if (currentMode === 'home') {
+                loadHomepage(true, nextPage);
+            } else if (currentMode === 'search') {
+                executeSearch(currentQuery, true, nextPage);
+            }
+        }
+    </script>
+</body>
+</html>
