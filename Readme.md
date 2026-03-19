@@ -448,15 +448,14 @@ nhentai-website/
 
 ### 🎯 Realistic Roadmap
 
-**Q1 2026:** Fix that one annoying bug  
-**Q2 2026:** Add the feature I promised  
-**Q3 2026:** Refactor (lol jk)  
-**Q4 2026:** Start a new project and abandon this one  
-**Q1 2069:** Come back because someone opened an issue  
-**Q2 2069:** "I should really update the dependencies"  
-**Q3 2069:** Update dependencies, everything breaks  
-**Q4 2069:** Revert to old dependencies  
-
+- **Q1 2026:** Fix that one annoying bug  
+- **Q2 2026:** Add the feature I promised  
+- **Q3 2026:** Refactor (lol jk)  
+- **Q4 2026:** Start a new project and abandon this one  
+- **Q1 2069:** Come back because someone opened an issue  
+- **Q2 2069:** "I should really update the dependencies"  
+- **Q3 2069:** Update dependencies, everything breaks  
+- **Q4 2069:** Revert to old dependencies  
 ---
 
 ### 📝 Contributing to Future Enhancements
