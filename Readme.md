@@ -107,7 +107,7 @@ Python 3.x     # The only language that matters
 ### Step 1: Clone This Bad Boy
 
 ```bash
-git clone https://github.com/yourusername/nhentai-website.git
+git clone https://github.com/indiser/Manga-Website.git
 cd nhentai-website
 ```
 
