@@ -575,7 +575,7 @@ If you've read this far, you either:
 
 **To recruiters:** Yes, I can code. Yes, I have a sense of humor. Yes, I'm available for hire. No, I won't build this for your company.
 
-**To developers:** Feel free to steal this code. I stole half of it from Stack Overflow anyway.
+**To developers:** Feel free to steal this code.
 
 **To my mom:** This is a book cataloging system. Don't Google it.
 
