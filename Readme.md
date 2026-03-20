@@ -26,7 +26,9 @@
 
 ## 🤔 What Even Is This?
 
-This is a **full-stack web application** that scrapes, parses, and serves manga content from nHentai with a beautiful, responsive UI. Think of it as Netflix, but for... *research materials*. 
+This is a **full-stack web application** - not just an API, but an actual working website with a gorgeous UI that you can click around in. It scrapes, parses, and serves manga content with infinite scroll, lightbox reader, and all the bells and whistles. Think of it as Netflix, but for... *research materials*.
+
+**Wait, is this just an API?** NO! This is a complete, functional website. You open it in your browser, you see a beautiful homepage, you click stuff, things happen. It's the real deal. 
 
 **Why did I build this?** 
 - ✅ To learn web scraping (totally the main reason)
@@ -149,7 +151,7 @@ Successfully installed flask-2.x.x ...
 ### Step 4: Run the Server (Moment of Truth)
 
 ```bash
-python api.py
+python app.py
 ```
 
 **If you see:**
@@ -168,14 +170,30 @@ ModuleNotFoundError: No module named 'flask'
 
 Navigate to `http://localhost:5000` and witness the glory.
 
+**Important:** This opens an actual WEBSITE, not just API endpoints. You'll see:
+- A beautiful dark-themed homepage with infinite scroll
+- A search bar that actually works
+- Clickable manga cards with cover images
+- A full lightbox reader with keyboard navigation
+- Download buttons that generate PDFs
+
+It's not just JSON responses - it's a real, functional web app that your grandma could use (but probably shouldn't).
+
 ---
 
 ## 🎮 Usage (For Research Purposes Only)
 
-### Basic Search
+### Using the Website (Yes, It's an Actual Website!)
 
+**Homepage:**
+- Open `http://localhost:5000` in your browser
+- Scroll through the latest uploads (infinite scroll baby!)
+- Click any manga card to view details
+- Click "Load More" to... load more (shocking, I know)
+
+**Search Bar:**
 1. **By ID:** Type `177013` (if you know, you know 💀)
-2. **By Title:** Type `"Metamorphosis"` (why would you do this to yourself?)
+2. **By Title:** Type any title or partial title
 3. **By Tags:** Type `tag:"vanilla"` (the wholesome route)
 
 ### Advanced Search Queries
@@ -190,14 +208,22 @@ tag:"wholesome" -tag:"ntr" # Wholesome content only (the good ending)
 
 ### Keyboard Shortcuts (Because Mice Are Overrated)
 
+**In the Lightbox Reader:**
 - `→` Next page
 - `←` Previous page  
 - `Esc` Close reader (for when your mom walks in)
+- Click "Download Page" for single page PNG
+- Click "Download PDF" for the whole thing (go make coffee)
+
+**General:**
 - `Alt+F4` Close everything (nuclear option)
+- `Ctrl+W` Close tab (slightly less nuclear)
 
 ---
 
 ## 🌐 API Endpoints (RESTful and Respectful)
+
+**Note:** While this is a full website, it also has a RESTful API backend. You can use these endpoints directly if you want to build your own frontend (but why would you? Mine is beautiful).
 
 ### `GET /api?manga_id={id}`
 Fetches complete manga metadata.
@@ -245,7 +271,7 @@ Downloads a single page as PNG.
 ```
 nhentai-website/
 │
-├── api.py                 # The brain (500+ lines of spaghetti)
+├── app.py                 # The brain (500+ lines of spaghetti)
 ├── requirements.txt       # Dependency hell manifest
 ├── README.md             # You are here (congrats on reading this far)
 │
@@ -264,7 +290,7 @@ nhentai-website/
 
 **What I actually did:**
 ```
-├── api.py  # Everything lives here
+├── app.py  # Everything lives here
 └── index.html  # And here
 ```
 
@@ -456,6 +482,7 @@ nhentai-website/
 - **Q2 2069:** "I should really update the dependencies"  
 - **Q3 2069:** Update dependencies, everything breaks  
 - **Q4 2069:** Revert to old dependencies  
+
 ---
 
 ### 📝 Contributing to Future Enhancements
