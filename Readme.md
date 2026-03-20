@@ -622,8 +622,7 @@ If you've read this far, you either:
 ## 📞 Contact
 
 **Email:** [your.email@example.com]  
-**LinkedIn:** [Your LinkedIn]  
-**GitHub:** [Your GitHub]  
+**GitHub:** https://github.com/indiser  
 **Therapy Hotline:** 1-800-WHY-DID-I-BUILD-THIS
 
 ---
