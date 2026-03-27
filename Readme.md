@@ -345,7 +345,7 @@ nhentai-website/
 - Added Gunicorn
 - Still broke
 - Gave up, runs on localhost
-- Just kidding. Programmers never Give up. <a href="https://hentai-manga.onrender.com">Link</a>
+- Just kidding. Programmers never Give up. <a href="https://hmanga.onrender.com">Link</a>
 
 ---
 
