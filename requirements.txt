@@ -6,3 +6,4 @@ beautifulsoup4
 img2pdf
 pillow
 gunicorn
+uvicorn
