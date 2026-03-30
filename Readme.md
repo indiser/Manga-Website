@@ -238,7 +238,7 @@ Fetches complete manga metadata.
   "title": "Emergence",
   "tags": ["depression", "life_choices", "regret"],
   "num_pages": 225,
-  "page_urls": ["https://i.nhentai.net/..."],
+  "page_urls": ["https://i.some hentai website.net/..."],
   "favorites": 50000,
   "recommendations": [
     {
@@ -281,7 +281,7 @@ Downloads a single page as PNG.
 ## 📁 Project Structure (Organized Chaos)
 
 ```
-nhentai-website/
+some hentai website-website/
 │
 ├── app.py                 # The brain (500+ lines of spaghetti)
 ├── requirements.txt       # Dependency hell manifest
@@ -681,7 +681,7 @@ If you've read this far, you either:
 - **My Keyboard** - For surviving my rage (and the rewrite)
 - **Cloudflare** - For making me a better developer (by force)
 - **SvelteKit** - For teaching me that nothing lasts forever
-- **The nHentai Devs** - For keeping me employed with constant breaking changes
+- **The some hentai website Devs** - For keeping me employed with constant breaking changes
 - **Regex** - For being both my best friend and worst enemy
 - **You** - For reading this entire README (seriously, thank you)
 
