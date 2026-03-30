@@ -107,12 +107,33 @@ def getmanga():
                     thumbnail_url = img_tag.get('data-src') or img_tag.get('src')
                     if thumbnail_url and thumbnail_url.startswith('//'):
                         thumbnail_url = f"https:{thumbnail_url}"
+
+
+                css_classes = gallery.get('class', [])
+                language = 'japanese' # Default
+                
+                if 'lang-gb' in css_classes:
+                    language = 'english'
+                elif 'lang-cn' in css_classes:
+                    language = 'chinese'
+                elif 'lang-jp' in css_classes:
+                    language = 'japanese'
+
+                if not language:
+                    title_lower = rec_title.lower()
+                    if '[english]' in title_lower:
+                        language = 'english'
+                    elif '[chinese]' in title_lower or '翻译' in title_lower:
+                        language = 'chinese'
+                    else:
+                        language = 'japanese'
                 
                 if rec_id.isdigit():
                     recommendations.append({
                         'id': int(rec_id),
                         'title': rec_title,
-                        'thumbnail_image': thumbnail_url
+                        'thumbnail_image': thumbnail_url,
+                        "language":language
                     })
 
         data_payload['recommendations'] = recommendations
