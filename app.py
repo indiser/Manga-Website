@@ -16,10 +16,14 @@ import threading
 import io
 import urllib.parse
 import json
+import itertools
+
 
 app=Flask(__name__)
 app.json.sort_keys = False
 CORS(app)
+
+session = tls_requests.Session(impersonate="chrome")
 
 @app.route("/")
 def home():
@@ -32,10 +36,8 @@ def getmanga():
     if not manga_id:
         return jsonify(error="Missing manga_id parameter"), 400
     nhentai_url=f"https://nhentai.net/g/{manga_id}/"
-    HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    response=tls_requests.get(url=nhentai_url,impersonate="chrome")
+    
+    response=session.get(nhentai_url)
 
     if response.status_code==404:
         return jsonify(error="Not Found"), 404
@@ -48,65 +50,80 @@ def getmanga():
     
     if response.status_code==200:
         data_payload = {}
-        json_pattern = r"window\._gallery\s*=\s*JSON\.parse\(\"(.*?)\"\);"
-        match = re.search(json_pattern, response.text)
+        json_pattern = r'<script type="application/json" data-sveltekit-fetched data-url="/api/v2/galleries/.*?">(.*?)</script>'
+        match = re.search(json_pattern, response.text, re.DOTALL)
         if match:
-            clean_json_str = match.group(1).encode('utf-8').decode('unicode_escape')
-            gallery_data = json.loads(clean_json_str)
+            clean_json_str = match.group(1)
+            svelte_wrapper = json.loads(clean_json_str)
+            gallery_data = json.loads(svelte_wrapper.get('body', '{}'))
 
-            media_id = gallery_data['media_id']
-            pages = gallery_data['images']['pages']
+            media_id = gallery_data.get('media_id')
+            pages = gallery_data.get('pages', [])
             page_urls = []
 
-            ext_map = {'j': 'jpg', 'p': 'png', 'w': 'webp', 'g': 'gif'}
-            # Construct the direct image URLs
-            for i, page in enumerate(pages, start=1):
-                ext = ext_map.get(page['t'], 'jpg')
-                page_urls.append(f"https://i.nhentai.net/galleries/{media_id}/{i}.{ext}")
+            for page in pages:
+                path = page.get('path')
+                if path:
+                    page_urls.append(f"https://i.nhentai.net/{path}")
 
+            tags = gallery_data.get('tags', [])
             data_payload = {
-                'id': int(gallery_data['id']),
-                'title': gallery_data['title']['english'],
-                'date': datetime.fromtimestamp(gallery_data['upload_date']).strftime('%Y-%m-%d'),
-                'parodies':[tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'parody'],
-                'charecters':[tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'character'],
-                'groups': [tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'group'],
-                'categories': [tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'category'],
-                'language':[tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'language'],
-                'favorites': int(gallery_data['num_favorites']),
-                'tags': [tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'tag'],
-                'artists': [tag['name'] for tag in gallery_data['tags'] if tag['type'] == 'artist'],
-                'num_pages': int(gallery_data['num_pages'])
+                'id': gallery_data.get('id'),
+                'title': gallery_data.get('title', {}).get('english'),
+                'date': datetime.fromtimestamp(gallery_data.get('upload_date', 0)).strftime('%Y-%m-%d') if gallery_data.get('upload_date') else None,
+                'parodies': [tag.get('name') for tag in tags if tag.get('type') == 'parody'],
+                'characters': [tag.get('name') for tag in tags if tag.get('type') == 'character'],
+                'groups': [tag.get('name') for tag in tags if tag.get('type') == 'group'],
+                'categories': [tag.get('name') for tag in tags if tag.get('type') == 'category'],
+                'language': [tag.get('name') for tag in tags if tag.get('type') == 'language'],
+                'favorites': gallery_data.get('num_favorites', 0),
+                'tags': [tag.get('name') for tag in tags if tag.get('type') == 'tag'],
+                'artists': [tag.get('name') for tag in tags if tag.get('type') == 'artist'],
+                'num_pages': gallery_data.get('num_pages', 0),
+                'media_id': media_id,
+                'page_urls': page_urls
             }
-
-            data_payload['media_id'] = media_id
-            data_payload['page_urls'] = page_urls
         
         soup = BeautifulSoup(response.text, 'html.parser')
         recommendations = []
         related_container = soup.find('div', id='related-container')
 
         if related_container:
-            for gallery in related_container.find_all('div', class_='gallery'):
+            galleries = related_container.find_all('div', class_='gallery')
+            for gallery in galleries:
                 link_tag = gallery.find('a', class_='cover')
-                caption_tag = gallery.find('div', class_='caption')
+                if not link_tag:
+                    continue
+                    
+                href = link_tag.get('href', '')
+                rec_id = href.strip('/').split('/')[-1] 
                 
-                if link_tag and caption_tag:
-                    rec_id = link_tag['href'].strip('/').split('/')[-1]
-                    rec_title = caption_tag.text
-                    recommendations.append({'id': int(rec_id), 'title': rec_title})
+                caption_tag = gallery.find('div', class_='caption')
+                rec_title = caption_tag.text.strip() if caption_tag else "Unknown Title"
+                
+                img_tag = gallery.find('img')
+                thumbnail_url = None
+                if img_tag:
+                    thumbnail_url = img_tag.get('data-src') or img_tag.get('src')
+                    if thumbnail_url and thumbnail_url.startswith('//'):
+                        thumbnail_url = f"https:{thumbnail_url}"
+                
+                if rec_id.isdigit():
+                    recommendations.append({
+                        'id': int(rec_id),
+                        'title': rec_title,
+                        'thumbnail_image': thumbnail_url
+                    })
 
         data_payload['recommendations'] = recommendations
 
-        # --- PART 3: EXTRACT COVER IMAGE ---
         cover_div = soup.find('div', id='cover')
         if cover_div:
-            # We must look for 'data-src', NOT 'src'
             cover_img = cover_div.find('img')
-            if cover_img and 'data-src' in cover_img.attrs:
-                # The URL usually starts with //, so we prepend https:
-                cover_url = "https:" + cover_img['data-src']
-                data_payload['cover_image'] = cover_url
+            if cover_img and 'src' in cover_img.attrs:
+                data_payload['cover_image'] = cover_img.get('data-src') or cover_img.get('src')
+
+        return data_payload
         
     return jsonify(data_payload)
     
@@ -120,17 +137,19 @@ def download_manga():
     # 1. Fetch metadata to get media_id and page count
     nhentai_url = f"https://nhentai.net/g/{manga_id}/"
     HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    response = tls_requests.get(url=nhentai_url, impersonate="chrome")
+    response = session.get(nhentai_url)
     
     if response.status_code != 200:
         return jsonify(error="Failed to fetch manga data"), response.status_code
 
-    match = re.search(r"window\._gallery\s*=\s*JSON\.parse\(\"(.*?)\"\);", response.text)
+    match = re.search(r'<script type="application/json" data-sveltekit-fetched data-url="/api/v2/galleries/.*?">(.*?)</script>', response.text)
     if not match:
         return jsonify(error="Metadata not found"), 500
-
-    gallery_data = json.loads(match.group(1).encode('utf-8').decode('unicode_escape'))
-    media_id = gallery_data['media_id']
+    
+    clean_json_str = match.group(1)
+    svelte_wrapper = json.loads(clean_json_str)
+    gallery_data = json.loads(svelte_wrapper.get('body', '{}'))
+    media_id = gallery_data.get('media_id')
     safe_title = re.sub(r'[<>:"/\\|?*]', '', gallery_data['title']['english'])[:50]
     
     # 2. Setup temporary folders with absolute paths
@@ -141,40 +160,16 @@ def download_manga():
     
     image_paths = []
     
-    ext_map = {'j': 'jpg', 'p': 'png', 'w': 'webp', 'g': 'gif'}
     # 3. Download and Optimize Images (WARNING: This will block the server until finished)
-    for i, page in enumerate(gallery_data['images']['pages'], start=1):
-        ext = ext_map.get(page['t'], 'jpg') # Resolves the correct extension, defaults to jpg if unknown
-        img_url=f"https://i.nhentai.net/galleries/{media_id}/{i}.{ext}"
-        filepath = os.path.join(temp_folder, f"{i}.{ext}")
-        entry=os.path.join(os.path.dirname(os.path.abspath(__file__)),"entry.json")
-
-        # try:
-        #     # 1. Download the raw file
-        #     with requests.get(img_url, headers=HEADERS, stream=True) as r:
-        #         r.raise_for_status()
-        #         with open(filepath, 'wb') as f:
-        #             for chunk in r.iter_content(chunk_size=8192):
-        #                 f.write(chunk)
-            
-        #     # 2. MINIMAL FIX: Strip Alpha and force JPEG format
-        #     jpg_path = os.path.join(temp_folder, f"{i}.jpg")
-        #     with Image.open(filepath) as img:
-        #         # "LA" is Grayscale with Alpha, "P" is Palette (often has transparency)
-        #         if img.mode in ("RGBA", "P", "LA"):
-        #             img = img.convert("RGB") # Violently strips transparency
-        #         img.save(jpg_path, "JPEG")
-            
-        #     # 3. Append only the guaranteed safe JPEG to the PDF compiler
-        #     image_paths.append(jpg_path)
-            
-        # except Exception as e:
-        #     print(f"Error processing page {i}: {e}")
-        #     continue
-
+    for i, page in enumerate(gallery_data.get('pages',[]), start=1):
+        path = page.get('path','jpg')
+        if not path:
+            continue
+        img_url=f"https://i.nhentai.net/{path}"
+        filepath = os.path.join(temp_folder, f"{i}.webp")
         try:
             # 1. Download the raw file in one shot using the Cloudflare bypass
-            img_response = tls_requests.get(img_url, impersonate="chrome")
+            img_response = session.get(img_url)
             
             if img_response.status_code == 200:
                 with open(filepath, 'wb') as f:
@@ -199,7 +194,7 @@ def download_manga():
 
     # 4. Generate PDF
     if not image_paths:
-        shutil.rmtree(temp_folder)
+        shutil.rmtree(temp_folder, ignore_errors=True)
         return jsonify(error="Failed to download any images"), 500
 
     try:
@@ -229,11 +224,17 @@ def download_page():
     image_url = request.args.get("url")
     custom_filename = request.args.get("filename") # Catch the new parameter
     
-    if not image_url or "i.nhentai.net" not in image_url:
+    if not image_url or "nhentai.net" not in image_url:
         return jsonify(error="Invalid or unauthorized URL"), 400
+    
+    if "galleries/" in image_url:
+        parts = image_url.split("galleries/")
+        if len(parts) > 2:
+            # Reconstruct the URL properly
+            image_url = f"{parts[0]}galleries/{parts[-1]}"
 
     try:
-        response = tls_requests.get(image_url,impersonate="chrome")
+        response = session.get(image_url)
         
         if response.status_code != 200:
             return jsonify(error=f"Failed to fetch image. Status: {response.status_code}"), response.status_code
@@ -278,7 +279,7 @@ def get_homepage():
         # url = "https://nhentai.net/"
         url = f"https://nhentai.net/?page={page}"
         # We must use tls_requests to bypass Cloudflare on the homepage
-        response = tls_requests.get(url,impersonate="chrome")
+        response = session.get(url)
         
         if response.status_code != 200:
             return jsonify(error="Failed to fetch discovery feed"), response.status_code
@@ -299,15 +300,15 @@ def get_homepage():
                 manga_id = link_tag['href'].strip('/').split('/')[-1]
                 title = caption_tag.text
 
-                data_tags = gallery.get('data-tags', '')
-                tags_list = data_tags.split() if data_tags else []
+                css_classes = gallery.get('class', [])
                 
-                language = None
-                if '12227' in tags_list:
+                language = 'japanese' # Default fallback
+                
+                if 'lang-gb' in css_classes:
                     language = 'english'
-                elif '29963' in tags_list:
+                elif 'lang-cn' in css_classes:
                     language = 'chinese'
-                elif '6346' in tags_list:
+                elif 'lang-jp' in css_classes:
                     language = 'japanese'
 
                 # 2. Secondary Failsafe: If the uploader forgot the tag, aggressively parse the title
@@ -336,7 +337,6 @@ def get_homepage():
     except Exception as e:
         return jsonify(error=f"Internal Server Error: {str(e)}"), 500
 
-
     
 @app.route("/api/search")
 def search_manga():
@@ -351,7 +351,7 @@ def search_manga():
     url = f"https://nhentai.net/search/?q={query}&page={page}"
     
     try:
-        response = tls_requests.get(url, impersonate="chrome")
+        response = session.get(url)
         
         if response.status_code != 200:
             return jsonify(error=f"Upstream Error: {response.status_code}"), response.status_code
@@ -367,17 +367,17 @@ def search_manga():
             
             if link_tag and caption_tag and img_tag:
                 manga_id = link_tag['href'].strip('/').split('/')[-1]
-                title = caption_tag.text
+                title = caption_tag.text.strip()
                 
-                data_tags = gallery.get('data-tags', '')
-                tags_list = data_tags.split() if data_tags else []
+                css_classes = gallery.get('class', [])
                 
-                language = None
-                if '12227' in tags_list:
+                language = 'japanese' # Default fallback
+                
+                if 'lang-gb' in css_classes:
                     language = 'english'
-                elif '29963' in tags_list:
+                elif 'lang-cn' in css_classes:
                     language = 'chinese'
-                elif '6346' in tags_list:
+                elif 'lang-jp' in css_classes:
                     language = 'japanese'
 
                 # 2. Secondary Failsafe: If the uploader forgot the tag, aggressively parse the title
@@ -410,4 +410,3 @@ def search_manga():
 
 if __name__=='__main__':
     app.run(debug=True)
-
